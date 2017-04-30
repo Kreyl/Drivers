@@ -68,7 +68,7 @@ struct ReadData_t {
 #define ReadData_SIZE     sizeof(ReadData_t)
 
 // CRC
-#define POLYNOMIAL      (uint16_t)0x131 //P(x)=x^8+x^5+x^4+1 = 100110001
+#define POLYNOMIAL      (uint16_t)0x131 // P(x)=x^8+x^5+x^4+1 = 100110001
 #define CHECKSUM_ERROR  0x10
 
 

@@ -1,0 +1,128 @@
+/*
+ * disp_MAX7219.cpp
+ *
+ *  Created on: 02 апр. 2017 г.
+ *      Author: Elessar
+ */
+
+#include "disp_MAX7219.h"
+
+
+void Disp_MAX7219_t::Print(const char *Str, int32_t Data, uint8_t Decade) {
+    uint8_t Seg = 1;
+    uint8_t SymCode;
+    bool negative = false;
+    Decade++;
+    Clear();
+
+    // PrintNamber
+    if (Data != INT32_MAX) {
+        if (Data < 0) { negative = true; Data = -Data; }
+        do {
+            uint32_t temp = Data/10;
+#if defined dmBCDcode
+            SymCode = Data-(temp*10);
+#elif defined dmNoDecode
+            SymCode = SymCodeNam[Data-(temp*10)];
+#endif
+            if (Seg == Decade and Seg > 1) SymCode |= symPoint;
+            WriteRegister(Seg, SymCode);
+            Seg++;
+            Data = temp;
+        } while (Data > 0);
+        while (Seg < Decade) { WriteRegister(Seg, sym_0); Seg++; }  // дописать нули
+        if (Seg == Decade) { WriteRegister(Seg, sym_0 | symPoint); Seg++; };
+        if (negative) WriteRegister(Seg, symMinus);
+    }
+
+    // PrintChar
+#if defined dmBCDcode
+    Seg = SegCount;
+    while (*Str != 0) {
+        switch (*Str){
+            case '-': SymCode = symMinus; break;
+            case ' ': SymCode = symEmpty; break;
+            case 'E': SymCode = sym_E; break;
+            case 'H': SymCode = sym_H; break;
+            case 'L': SymCode = sym_L; break;
+            case 'P': SymCode = sym_P; break;
+            case '0':
+            case 'O':
+            case 'D': SymCode = sym_0; break;
+            case '1': SymCode = sym_1; break;
+            case '2': SymCode = sym_2; break;
+            case '3': SymCode = sym_3; break;
+            case '4': SymCode = sym_4; break;
+            case '5':
+            case 'S': SymCode = sym_5; break;
+            case '6': SymCode = sym_6; break;
+            case '7': SymCode = sym_7; break;
+            case '8':
+            case 'B': SymCode = sym_8; break;
+            case '9': SymCode = sym_9; break;
+            default : SymCode = symEmpty; break;
+        }
+        Str++;
+        if (*Str == '.' or *Str == ',') {
+            SymCode |= symPoint;
+            Str++;
+        }
+        WriteRegister(Seg, SymCode);
+        Seg --;
+    }
+#elif defined dmNoDecode
+    Seg = SegCount;
+    while (*Str != 0) {
+        switch (*Str) {
+            case '-': SymCode = symMinus; break;
+            case '_': SymCode = symSpace; break;
+            case ' ': SymCode = symEmpty; break;
+            case 'A':
+            case 'R': SymCode = sym_A; break;
+            case 'b': SymCode = sym_b; break;
+            case 'C': SymCode = sym_C; break;
+            case 'c': SymCode = sym_c; break;
+            case 'd': SymCode = sym_d; break;
+            case 'E': SymCode = sym_E; break;
+            case 'F': SymCode = sym_F; break;
+            case 'G': SymCode = sym_G; break;
+            case 'H': SymCode = sym_H; break;
+            case 'h': SymCode = sym_h; break;
+            case 'I': SymCode = sym_I; break;
+            case 'J': SymCode = sym_J; break;
+            case 'L': SymCode = sym_L; break;
+            case 'n': SymCode = sym_n; break;
+            case 'o': SymCode = sym_o; break;
+            case 'P': SymCode = sym_P; break;
+            case 'r': SymCode = sym_r; break;
+            case 't': SymCode = sym_t; break;
+            case 'U': SymCode = sym_U; break;
+            case 'u': SymCode = sym_u; break;
+            case '0':
+            case 'O':
+            case 'D': SymCode = sym_0; break;
+            case '1': SymCode = sym_1; break;
+            case '2': SymCode = sym_2; break;
+            case '3': SymCode = sym_3; break;
+            case '4': SymCode = sym_4; break;
+            case '5':
+            case 'S': SymCode = sym_5; break;
+            case '6': SymCode = sym_6; break;
+            case '7': SymCode = sym_7; break;
+            case '8':
+            case 'B': SymCode = sym_8; break;
+            case '9': SymCode = sym_9; break;
+            default : SymCode = symEmpty; break;
+        }
+        Str++;
+        if (*Str == '.' or *Str == ',') {
+            SymCode |= symPoint;
+            Str++;
+        }
+        WriteRegister(Seg, SymCode);
+        Seg --;
+    }
+#endif
+}
+
+

@@ -1,4 +1,4 @@
-SHT2xD - Humidity and Temperature sensor IC
+Humidity and Temperature sensor IC
 Supports SHT20D, SHT21D, SHT25D
 I2C interface
 
