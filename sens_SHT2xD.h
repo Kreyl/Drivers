@@ -148,7 +148,7 @@ public:
         uint8_t Result = StartMeasurement(AMeasType);
         if (Result == retvOk) {
             MeasType = AMeasType;
-            TmrReadMeas.Start();
+            TmrReadMeas.StartOrRestart();
         }
         return Result;
     }
