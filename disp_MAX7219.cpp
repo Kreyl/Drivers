@@ -7,6 +7,15 @@
 
 #include "disp_MAX7219.h"
 
+void BlinkTmrCallback(void *p) {
+    reinterpret_cast<Disp_MAX7219_t*>(p)->BlinkTmrCallbakHandler();
+}
+void Disp_MAX7219_t::BlinkTaskI() {
+    static bool lit = true;
+    if (lit) WriteRegister(SegBlinking, symEmpty);
+    else WriteRegister(SegBlinking, DispBuffer[SegBlinking-1]);
+    lit = ~lit;
+}
 
 void Disp_MAX7219_t::Print(const char *Str, int32_t Data, uint8_t Decade) {
     uint8_t Seg = 1;
@@ -14,26 +23,6 @@ void Disp_MAX7219_t::Print(const char *Str, int32_t Data, uint8_t Decade) {
     bool negative = false;
     Decade++;
     Clear();
-
-    // PrintNamber
-    if (Data != INT32_MAX) {
-        if (Data < 0) { negative = true; Data = -Data; }
-        do {
-            uint32_t temp = Data/10;
-#if defined dmBCDcode
-            SymCode = Data-(temp*10);
-#elif defined dmNoDecode
-            SymCode = SymCodeNam[Data-(temp*10)];
-#endif
-            if (Seg == Decade and Seg > 1) SymCode |= symPoint;
-            WriteRegister(Seg, SymCode);
-            Seg++;
-            Data = temp;
-        } while (Data > 0);
-        while (Seg < Decade) { WriteRegister(Seg, sym_0); Seg++; }  // дописать нули
-        if (Seg == Decade) { WriteRegister(Seg, sym_0 | symPoint); Seg++; };
-        if (negative) WriteRegister(Seg, symMinus);
-    }
 
     // PrintChar
 #if defined dmBCDcode
@@ -67,7 +56,7 @@ void Disp_MAX7219_t::Print(const char *Str, int32_t Data, uint8_t Decade) {
             SymCode |= symPoint;
             Str++;
         }
-        WriteRegister(Seg, SymCode);
+        WriteBuffer(Seg, SymCode);
         Seg --;
     }
 #elif defined dmNoDecode
@@ -119,10 +108,34 @@ void Disp_MAX7219_t::Print(const char *Str, int32_t Data, uint8_t Decade) {
             SymCode |= symPoint;
             Str++;
         }
-        WriteRegister(Seg, SymCode);
+        WriteBuffer(Seg, SymCode);
         Seg --;
     }
 #endif
+
+    // PrintNamber
+    if (Data != INT32_MAX) {
+        if (Data < 0) { negative = true; Data = -Data; }
+        do {
+            uint32_t temp = Data/10;
+#if defined dmBCDcode
+            SymCode = Data-(temp*10);
+#elif defined dmNoDecode
+            SymCode = SymCodeNam[Data-(temp*10)];
+#endif
+            if (Seg == Decade and Seg > 1) SymCode |= symPoint;
+            WriteBuffer(Seg, SymCode);
+            Seg++;
+            Data = temp;
+        } while (Data > 0);
+        while (Seg < Decade) { WriteBuffer(Seg, sym_0); Seg++; }  // дописать нули
+        if (Seg == Decade) { WriteBuffer(Seg, sym_0 | symPoint); Seg++; };
+        if (negative) WriteBuffer(Seg, symMinus);
+    }
+
+    // Send Data
+    for (uint8_t Seg=1; Seg<=SegCount; Seg++)
+        WriteRegister(Seg, DispBuffer[Seg-1]);
 }
 
 

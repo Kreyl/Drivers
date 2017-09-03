@@ -31,6 +31,8 @@
 #if (defined dmBCDcode) and (defined dmNoDecode)
 #error "MAX7219.h: Only one Decode mode"
 #endif
+#define BlinkInterval_ms    200
+#define MaxSegments         8
 
 // Registers
 #define MAX_DecodeMode      0x09    // Data mask ~0b11111111
@@ -126,17 +128,30 @@ const uint8_t SymCodeNam[] = {
 #define CsHi()  PinSetHi(MAX_GPIO, MAX_CS)
 #define CsLo()  PinSetLo(MAX_GPIO, MAX_CS)
 
+void BlinkTmrCallback(void *p);    // VirtualTimer callback
+
 
 class Disp_MAX7219_t {
 private:
     Spi_t ISpi;
-    uint8_t SegCount = 8;
+    uint8_t SegCount = MaxSegments;
+    uint8_t DispBuffer[MaxSegments] = {symEmpty};
+    uint8_t SegBlinking = 1;
+    virtual_timer_t BlinkTMR;
     void WriteRegister (uint8_t ARegAddr, uint8_t AData) {
         CsLo();                         // Start transmission
         ISpi.ReadWriteByte(ARegAddr);   // Transmit header byte
         ISpi.ReadWriteByte(AData);      // Write data
         CsHi();                         // End transmission
     }
+    void WriteBuffer (uint8_t AIndex, uint8_t AData) {
+        DispBuffer[AIndex-1] = AData;
+    }
+    void BlinkTmrStsrtI(){
+        if(chVTIsArmedI(&BlinkTMR)) chVTResetI(&BlinkTMR);
+        chVTSetI(&BlinkTMR, MS2ST(BlinkInterval_ms), BlinkTmrCallback, this);
+    }
+    void BlinkTaskI();
 public:
     void Init(const uint8_t ASegCount, const Intensity_t Intensity) {
         // ==== GPIO ====
@@ -156,16 +171,39 @@ public:
     }
 
     void Clear() {
-        for (uint8_t Seg=1; Seg<=SegCount; Seg++)
+        for (uint8_t Seg=1; Seg<=SegCount; Seg++) {
             WriteRegister(Seg, symEmpty);
+            DispBuffer[Seg-1] = symEmpty;
+        }
     }
     void Print(const char *Str, int32_t Ddta = INT32_MAX, uint8_t Decade = 0);
+    void SetBlinking(const uint8_t ASegment) {
+        chSysLock();
+        SegBlinking = ASegment;
+        if(chVTIsArmedI(&BlinkTMR)) {
+            chVTResetI(&BlinkTMR);
+            WriteRegister(SegBlinking, DispBuffer[SegBlinking-1]);
+        }
+        chVTSetI(&BlinkTMR, MS2ST(BlinkInterval_ms), BlinkTmrCallback, this);
+        chSysUnlock();
+    }
+    void StopBlinking() {
+        chVTReset(&BlinkTMR);
+        WriteRegister(SegBlinking, DispBuffer[SegBlinking-1]);
+    }
     void Test() { WriteRegister(MAX_DisplayTest, MAX_Test); }      // Display-test mode turns all LEDs ON
 
     void ON() { WriteRegister(MAX_Shutdown, MAX_StayAwake); }
     void OFF() { WriteRegister(MAX_Shutdown, MAX_ShutDown); }
 
     Disp_MAX7219_t(): ISpi(MAX_SPI) {}
+    // Inner use
+    void BlinkTmrCallbakHandler() {
+        chSysLockFromISR();
+        BlinkTmrStsrtI();
+        BlinkTaskI();
+        chSysUnlockFromISR();
+    }
 };
 
 

@@ -11,6 +11,8 @@
 #include "evt_mask.h"
 #include "uart.h"
 
+#define SNS_ENABLED         // Comment this out for debug without sensor
+
 #define SHT_i2C             i2c1
 #define SHT_I2C_ADDR        0x40 // Address specified in the Datasheet: 0x80
 //#define HoldMasterMODE      // SCL pull GND on Measurement
@@ -98,7 +100,7 @@ private:
         return i2c1.Write(SHT_I2C_ADDR, &Command, 1);
     }
     uint8_t StartMeasurement(MeasureType_t AMeasType) {
-        uint8_t Result;
+        uint8_t Result = retvFail;
         switch (AMeasType) {
             case mtTemperature:
                 Result = WriteCommand(SHT_MeasMode_T);
@@ -137,33 +139,45 @@ public:
     uint8_t Init(thread_t *APThread, SHT_Resolution_t Resolutions) {
         uint8_t Result = retvOk;
 //        i2c1.ScanBus();
+#ifdef SNS_ENABLED
         Result |= ReadReg(SHT_UserReg_R, &UserRegister);
         UserRegister = (UserRegister & Resolution_MASK) | Resolutions;
         Result |= WriteReg(SHT_UserReg_W, UserRegister);
+#endif
         TmrReadMeas.Init(APThread);
         return Result;
     }
 
     uint8_t Start(MeasureType_t AMeasType) {
-        uint8_t Result = StartMeasurement(AMeasType);
+        uint8_t Result = retvOk;
+#ifdef SNS_ENABLED
+        Result = StartMeasurement(AMeasType);
         if (Result == retvOk) {
+#endif
             MeasType = AMeasType;
             TmrReadMeas.StartOrRestart();
+#ifdef SNS_ENABLED
         }
+#endif
         return Result;
     }
-    uint8_t Read(int32_t *PVaule) {
+    uint8_t Read(int32_t *PValue) {
+        uint8_t Result = retvOk;
+#ifdef SNS_ENABLED
         int32_t Data;
-        uint8_t Result = ReadMeasurement(&Data);
+        Result = ReadMeasurement(&Data);
         if (Result == retvOk)
             switch (MeasType) {
                 case mtTemperature:
-                    *PVaule = 17572 * Data/65536 - 4685; // float: 175.72 * Data/65536.00 -46.85
+                    *PValue = 17572 * Data/65536 - 4685; // float: 175.72 * Data/65536.00 -46.85
                     break;
                 case mtHumidity:
-                    *PVaule = 12500 * Data/65536 - 600; // float: 125.0 * Data/65536.00 -6.0
+                    *PValue = 12500 * Data/65536 - 600; // float: 125.0 * Data/65536.00 -6.0
                     break;
             }
+#else
+        *PValue = 0;
+#endif
         return Result;
     }
     uint8_t Start_AND_Read(MeasureType_t MeasType, int32_t *PVaule) {
