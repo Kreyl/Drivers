@@ -49,7 +49,8 @@ Example:
 
 SHT2xD_t Sens1;
 ...
-Sens1.Init(chThdGetSelfX(), RES_12_14BIT);
+Sens1.SetupSeqEndEvt(EVT_SHT_READY);
+Sens1.Init(RES_12_14BIT);
 ...
 Sens1.Start(mtTemperature);
 ...

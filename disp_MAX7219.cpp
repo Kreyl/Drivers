@@ -2,14 +2,11 @@
  * disp_MAX7219.cpp
  *
  *  Created on: 02 апр. 2017 г.
- *      Author: Elessar
+ *      Author: Elessar, Eldalim
  */
 
 #include "disp_MAX7219.h"
 
-void BlinkTmrCallback(void *p) {
-    reinterpret_cast<Disp_MAX7219_t*>(p)->BlinkTmrCallbakHandler();
-}
 void Disp_MAX7219_t::BlinkTaskI() {
     static bool lit = true;
     if (lit) WriteRegister(SegBlinking, symEmpty);
@@ -18,7 +15,7 @@ void Disp_MAX7219_t::BlinkTaskI() {
 }
 
 void Disp_MAX7219_t::Print(const char *Str, int32_t Data, uint8_t Decade) {
-    uint8_t Seg = 1;
+    uint8_t Seg;
     uint8_t SymCode;
     bool negative = false;
     Decade++;
@@ -113,7 +110,8 @@ void Disp_MAX7219_t::Print(const char *Str, int32_t Data, uint8_t Decade) {
     }
 #endif
 
-    // PrintNamber
+    // PrintNumber
+    Seg = 1;
     if (Data != INT32_MAX) {
         if (Data < 0) { negative = true; Data = -Data; }
         do {
@@ -121,7 +119,7 @@ void Disp_MAX7219_t::Print(const char *Str, int32_t Data, uint8_t Decade) {
 #if defined dmBCDcode
             SymCode = Data-(temp*10);
 #elif defined dmNoDecode
-            SymCode = SymCodeNam[Data-(temp*10)];
+            SymCode = SymCodeNum[Data-(temp*10)];
 #endif
             if (Seg == Decade and Seg > 1) SymCode |= symPoint;
             WriteBuffer(Seg, SymCode);

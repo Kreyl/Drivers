@@ -2,7 +2,7 @@
  * disp_MAX7219.h
  *
  *  Created on: 02 апр. 2017 г.
- *      Author: Elessar
+ *      Author: Elessar, Eldalim
  */
 
 #pragma once
@@ -31,7 +31,7 @@
 #if (defined dmBCDcode) and (defined dmNoDecode)
 #error "MAX7219.h: Only one Decode mode"
 #endif
-#define BlinkInterval_ms    200
+#define BlinkInterval_MS    150
 #define MaxSegments         8
 
 // Registers
@@ -111,7 +111,7 @@ enum SymCode_t {
     sym_8 = 0b01111111,   // 8 B
     sym_9 = 0b01111011,   // 9
 };
-const uint8_t SymCodeNam[] = {
+const uint8_t SymCodeNum[] = {
         0b01111110,   // 0
         0b00110000,   // 1
         0b01101101,   // 2
@@ -128,16 +128,14 @@ const uint8_t SymCodeNam[] = {
 #define CsHi()  PinSetHi(MAX_GPIO, MAX_CS)
 #define CsLo()  PinSetLo(MAX_GPIO, MAX_CS)
 
-void BlinkTmrCallback(void *p);    // VirtualTimer callback
 
-
-class Disp_MAX7219_t {
+class Disp_MAX7219_t : private IrqHandler_t {
 private:
     Spi_t ISpi;
     uint8_t SegCount = MaxSegments;
     uint8_t DispBuffer[MaxSegments] = {symEmpty};
     uint8_t SegBlinking = 1;
-    virtual_timer_t BlinkTMR;
+    virtual_timer_t TmrBlink;
     void WriteRegister (uint8_t ARegAddr, uint8_t AData) {
         CsLo();                         // Start transmission
         ISpi.ReadWriteByte(ARegAddr);   // Transmit header byte
@@ -147,11 +145,12 @@ private:
     void WriteBuffer (uint8_t AIndex, uint8_t AData) {
         DispBuffer[AIndex-1] = AData;
     }
-    void BlinkTmrStsrtI(){
-        if(chVTIsArmedI(&BlinkTMR)) chVTResetI(&BlinkTMR);
-        chVTSetI(&BlinkTMR, MS2ST(BlinkInterval_ms), BlinkTmrCallback, this);
-    }
     void BlinkTaskI();
+    void IIrqHandler() {
+        chVTSetI(&TmrBlink, MS2ST(BlinkInterval_MS), TmrKLCallback, this);
+        BlinkTaskI();
+    }
+
 public:
     void Init(const uint8_t ASegCount, const Intensity_t Intensity) {
         // ==== GPIO ====
@@ -180,15 +179,15 @@ public:
     void SetBlinking(const uint8_t ASegment) {
         chSysLock();
         SegBlinking = ASegment;
-        if(chVTIsArmedI(&BlinkTMR)) {
-            chVTResetI(&BlinkTMR);
+        if(chVTIsArmedI(&TmrBlink)) {
+            chVTResetI(&TmrBlink);
             WriteRegister(SegBlinking, DispBuffer[SegBlinking-1]);
         }
-        chVTSetI(&BlinkTMR, MS2ST(BlinkInterval_ms), BlinkTmrCallback, this);
+        chVTSetI(&TmrBlink, MS2ST(BlinkInterval_MS), TmrKLCallback, this);
         chSysUnlock();
     }
     void StopBlinking() {
-        chVTReset(&BlinkTMR);
+        chVTReset(&TmrBlink);
         WriteRegister(SegBlinking, DispBuffer[SegBlinking-1]);
     }
     void Test() { WriteRegister(MAX_DisplayTest, MAX_Test); }      // Display-test mode turns all LEDs ON
@@ -197,13 +196,6 @@ public:
     void OFF() { WriteRegister(MAX_Shutdown, MAX_ShutDown); }
 
     Disp_MAX7219_t(): ISpi(MAX_SPI) {}
-    // Inner use
-    void BlinkTmrCallbakHandler() {
-        chSysLockFromISR();
-        BlinkTmrStsrtI();
-        BlinkTaskI();
-        chSysUnlockFromISR();
-    }
 };
 
 

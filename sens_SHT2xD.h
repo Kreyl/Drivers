@@ -2,7 +2,7 @@
  * sens_SHT2xD.h
  *
  *  Created on: 18 апр. 2017 г.
- *      Author: Elessar
+ *      Author: Elessar, Eldalim
  */
 
 #pragma once
@@ -14,7 +14,7 @@
 #define SNS_ENABLED         // Comment this out for debug without sensor
 
 #define SHT_i2C             i2c1
-#define SHT_I2C_ADDR        0x40 // Address specified in the Datasheet: 0x80
+#define SHT_I2C_ADDR        0x40
 //#define HoldMasterMODE      // SCL pull GND on Measurement
 
 
@@ -37,18 +37,18 @@
 // Options (for User Register)
 // sensor resolutions
 typedef enum {
-    RES_12_14BIT          = 0x00, // RH=12bit, T=14bit
-    RES_8_12BIT           = 0x01, // RH= 8bit, T=12bit
-    RES_10_13BIT          = 0x80, // RH=10bit, T=13bit
-    RES_11_11BIT          = 0x81, // RH=11bit, T=11bit
+    RES_12_14BIT            = 0x00, // RH=12bit, T=14bit
+    RES_8_12BIT             = 0x01, // RH= 8bit, T=12bit
+    RES_10_13BIT            = 0x80, // RH=10bit, T=13bit
+    RES_11_11BIT            = 0x81, // RH=11bit, T=11bit
 } SHT_Resolution_t;
-#define Resolution_MASK    ~0x81  // Mask for res. bits (7,0) in user reg.
+#define Resolution_MASK     ~0x81  // Mask for res. bits (7,0) in user reg.
 // Heater control
 typedef enum {
-    Heater_ON             = 0x04, // heater on
-    Heater_OFF            = 0x00, // heater off
+    Heater_ON               = 0x04, // heater on
+    Heater_OFF              = 0x00, // heater off
 } SHT_Heater_t;
-#define Heater_MASK        ~0x04  // Mask for Heater bit(2) in user reg.
+#define Heater_MASK         ~0x04  // Mask for Heater bit (2) in user reg.
 
 
 // Measurement signal selection
@@ -60,26 +60,27 @@ typedef enum {
 struct MeasData_t {
     uint8_t MSB, LSB, dCRC;
 } __packed;
-#define MeasData_SIZE     sizeof(MeasData_t)
+#define MeasData_SIZE       sizeof(MeasData_t)
 
-#define MeasTimeOut  100       // Measurement Time-Out [mS]
+#define MeasTimeOut_MS      100       // Measurement Time-Out [mS]
 
 struct ReadData_t {
     uint8_t Data, dCRC;
 } __packed;
-#define ReadData_SIZE     sizeof(ReadData_t)
+#define ReadData_SIZE       sizeof(ReadData_t)
 
 // CRC
-#define POLYNOMIAL      (uint16_t)0x131 // P(x)=x^8+x^5+x^4+1 = 100110001
-#define CHECKSUM_ERROR  0x10
+#define POLYNOMIAL          (uint16_t)0x131 // P(x)=x^8+x^5+x^4+1 = 100110001
+#define CHECKSUM_ERROR      0x10
 
 
-class SHT2xD_t {
+class SHT2xD_t : private IrqHandler_t  {
 private:
     uint8_t UserRegister;
-    virtual_timer_t SHT_TMR;
     MeasureType_t MeasType;
-    TmrKL_t TmrReadMeas { MS2ST(MeasTimeOut), EVT_SHT_READY, tktOneShot };
+    thread_t *IPAppThd;
+    eventmask_t EvtEnd;
+    virtual_timer_t TmrReadMeas;
 
     uint8_t ReadReg(uint8_t RegAddr, uint8_t *Value) {
         uint8_t Result = retvOk;
@@ -134,20 +135,24 @@ private:
         if (crc != CheckSum) return CHECKSUM_ERROR; // Checksum error
         else return retvOk;
     }
+    void IIrqHandler() {
+        chEvtSignalI(IPAppThd, EvtEnd);
+    }
 
 public:
-    uint8_t Init(thread_t *APThread, SHT_Resolution_t Resolutions) {
+    uint8_t Init(SHT_Resolution_t Resolutions) {
         uint8_t Result = retvOk;
-//        i2c1.ScanBus();
 #ifdef SNS_ENABLED
         Result |= ReadReg(SHT_UserReg_R, &UserRegister);
         UserRegister = (UserRegister & Resolution_MASK) | Resolutions;
         Result |= WriteReg(SHT_UserReg_W, UserRegister);
 #endif
-        TmrReadMeas.Init(APThread);
         return Result;
     }
-
+    void SetupSeqEndEvt(eventmask_t AEvt) {
+        IPAppThd = chThdGetSelfX();
+        EvtEnd = AEvt;
+    }
     uint8_t Start(MeasureType_t AMeasType) {
         uint8_t Result = retvOk;
 #ifdef SNS_ENABLED
@@ -155,7 +160,7 @@ public:
         if (Result == retvOk) {
 #endif
             MeasType = AMeasType;
-            TmrReadMeas.StartOrRestart();
+            chVTSet(&TmrReadMeas, MS2ST(MeasTimeOut_MS), TmrKLCallback, this);
 #ifdef SNS_ENABLED
         }
 #endif
@@ -183,7 +188,7 @@ public:
     uint8_t Start_AND_Read(MeasureType_t MeasType, int32_t *PVaule) {
         uint8_t Result = retvOk;
         Result |= StartMeasurement(MeasType);
-        chThdSleepMilliseconds(MeasTimeOut);
+        chThdSleepMilliseconds(MeasTimeOut_MS);
         Result |= Read(PVaule);
         return Result;
     }
