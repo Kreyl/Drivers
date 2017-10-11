@@ -25,7 +25,7 @@ void Disp_MAX7219_t::Print(const char *Str, int32_t Data, uint8_t Decade) {
 #if defined dmBCDcode
     Seg = SegCount;
     while (*Str != 0) {
-        switch (*Str){
+        switch (*Str) {
             case '-': SymCode = symMinus; break;
             case ' ': SymCode = symEmpty; break;
             case 'E': SymCode = sym_E; break;

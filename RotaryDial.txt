@@ -1,0 +1,26 @@
+Rotary Dial
+Драйвер дискового номеронабирателя старых телефонных аппаратов.
+Событие EVT_DIAL_ARMED показывает, что пользователь начал набор номера.
+Событие EVT_DIAL_REDY показывает, что набор номера окончен.
+
+Example:
+
+#define Dial_Namber_GPIO    GPIOA
+#define Dial_Namber_PIN     1
+#define Dial_Disk_GPIO      GPIOB
+#define Dial_Disk_PIN       1
+...
+Dialer.Init();
+Dialer.SetupSeqEvents(EVT_DIAL_ARMED, EVT_DIAL_REDY);
+...
+if(EvtMsk & EVT_DIAL_REDY) {
+    switch(Dialer.GetNumber()) {
+        case 0x1A3: // 103
+        case 0xA3:  // 03
+            ...
+            break;
+        default:
+            break;
+    }
+}
+
