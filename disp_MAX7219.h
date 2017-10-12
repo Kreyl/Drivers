@@ -11,19 +11,6 @@
 #include "kl_lib.h"
 #include "board.h"
 
-// Pins
-#define MAX_GPIO            GPIOB
-#define MAX_CS              2
-#define MAX_SCK             3
-#define MAX_MOSI            5
-
-// SPI
-#define MAX_SPI             SPI1
-#if defined STM32F030
-#define MAX_SPI_AF          AF0
-#elif defined STM32L1XX
-#define MAX_SPI_AF          AF5
-#endif
 
 // Decode Mode
 //#define dmBCDcode
@@ -31,7 +18,7 @@
 #if (defined dmBCDcode) and (defined dmNoDecode)
 #error "MAX7219.h: Only one Decode mode"
 #endif
-#define BlinkInterval_MS    150
+#define BlinkInterval_MS    250
 #define MaxSegments         8
 
 // Registers
@@ -134,7 +121,7 @@ private:
     Spi_t ISpi;
     uint8_t SegCount = MaxSegments;
     uint8_t DispBuffer[MaxSegments] = {symEmpty};
-    uint8_t SegBlinking = 1;
+    uint8_t SegBlinking = 0;
     virtual_timer_t TmrBlink;
     void WriteRegister (uint8_t ARegAddr, uint8_t AData) {
         CsLo();                         // Start transmission
@@ -144,6 +131,12 @@ private:
     }
     void WriteBuffer (uint8_t AIndex, uint8_t AData) {
         DispBuffer[AIndex-1] = AData;
+    }
+    void ClearBuffer() {
+        chSysLock();
+        for (uint8_t Seg=0; Seg<=SegCount-1; Seg++)
+            DispBuffer[Seg] = symEmpty;
+        chSysUnlock();
     }
     void BlinkTaskI();
     void IIrqHandler() {
@@ -156,7 +149,7 @@ public:
         // ==== GPIO ====
         PinSetupOut      (MAX_GPIO, MAX_CS,   omPushPull);
         PinSetupAlterFunc(MAX_GPIO, MAX_SCK,  omPushPull, pudNone, MAX_SPI_AF);
-        PinSetupAlterFunc(MAX_GPIO, MAX_MOSI, omPushPull, pudNone, MAX_SPI_AF);
+        PinSetupAlterFunc(MAX_GPIO, MAX_SI, omPushPull, pudNone, MAX_SPI_AF);
         // ==== SPI ====    MSB first, master, ClkLowIdle, FirstEdge, Baudrate=f/2
         ISpi.Setup(boMSB, cpolIdleLow, cphaFirstEdge, sclkDiv2);
         ISpi.Enable();
@@ -170,6 +163,7 @@ public:
     }
 
     void Clear() {
+        chVTReset(&TmrBlink);
         for (uint8_t Seg=1; Seg<=SegCount; Seg++) {
             WriteRegister(Seg, symEmpty);
             DispBuffer[Seg-1] = symEmpty;
@@ -178,11 +172,9 @@ public:
     void Print(const char *Str, int32_t Ddta = INT32_MAX, uint8_t Decade = 0);
     void SetBlinking(const uint8_t ASegment) {
         chSysLock();
+        if(chVTIsArmedI(&TmrBlink))
+            WriteRegister(SegBlinking, DispBuffer[SegBlinking-1]);    // зажечь предыдущий сегмент
         SegBlinking = ASegment;
-        if(chVTIsArmedI(&TmrBlink)) {
-            chVTResetI(&TmrBlink);
-            WriteRegister(SegBlinking, DispBuffer[SegBlinking-1]);
-        }
         chVTSetI(&TmrBlink, MS2ST(BlinkInterval_MS), TmrKLCallback, this);
         chSysUnlock();
     }

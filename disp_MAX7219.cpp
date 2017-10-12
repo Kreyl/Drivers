@@ -11,7 +11,7 @@ void Disp_MAX7219_t::BlinkTaskI() {
     static bool lit = true;
     if (lit) WriteRegister(SegBlinking, symEmpty);
     else WriteRegister(SegBlinking, DispBuffer[SegBlinking-1]);
-    lit = ~lit;
+    lit = !lit;
 }
 
 void Disp_MAX7219_t::Print(const char *Str, int32_t Data, uint8_t Decade) {
@@ -19,7 +19,7 @@ void Disp_MAX7219_t::Print(const char *Str, int32_t Data, uint8_t Decade) {
     uint8_t SymCode;
     bool negative = false;
     Decade++;
-    Clear();
+    ClearBuffer();
 
     // PrintChar
 #if defined dmBCDcode
@@ -132,8 +132,10 @@ void Disp_MAX7219_t::Print(const char *Str, int32_t Data, uint8_t Decade) {
     }
 
     // Send Data
-    for (uint8_t Seg=1; Seg<=SegCount; Seg++)
-        WriteRegister(Seg, DispBuffer[Seg-1]);
+    for (uint8_t Seg=1; Seg<=SegCount; Seg++) {
+        if ( !(chVTIsArmed(&TmrBlink) and Seg == SegBlinking) )       // если текущий сегмент не мигает
+            WriteRegister(Seg, DispBuffer[Seg-1]);
+    }
 }
 
 
