@@ -14,16 +14,10 @@ void Disp_MAX7219_t::BlinkTaskI() {
     lit = !lit;
 }
 
-void Disp_MAX7219_t::Print(const char *Str, int32_t Data, uint8_t Decade) {
-    uint8_t Seg;
+void Disp_MAX7219_t::PrintChar(const char *Str) {
     uint8_t SymCode;
-    bool negative = false;
-    Decade++;
-    ClearBuffer();
-
-    // PrintChar
+    uint8_t Seg = SegCount;
 #if defined dmBCDcode
-    Seg = SegCount;
     while (*Str != 0) {
         switch (*Str) {
             case '-': SymCode = symMinus; break;
@@ -57,7 +51,6 @@ void Disp_MAX7219_t::Print(const char *Str, int32_t Data, uint8_t Decade) {
         Seg --;
     }
 #elif defined dmNoDecode
-    Seg = SegCount;
     while (*Str != 0) {
         switch (*Str) {
             case '-': SymCode = symMinus; break;
@@ -84,6 +77,7 @@ void Disp_MAX7219_t::Print(const char *Str, int32_t Data, uint8_t Decade) {
             case 't': SymCode = sym_t; break;
             case 'U': SymCode = sym_U; break;
             case 'u': SymCode = sym_u; break;
+            case 'Y': SymCode = sym_Y; break;
             case '0':
             case 'O':
             case 'D': SymCode = sym_0; break;
@@ -109,9 +103,19 @@ void Disp_MAX7219_t::Print(const char *Str, int32_t Data, uint8_t Decade) {
         Seg --;
     }
 #endif
+}
+
+void Disp_MAX7219_t::Print(const char *Str, int32_t Data, uint8_t Decade) {
+    uint8_t SymCode;
+    uint8_t Seg = 1;
+    bool negative = false;
+    Decade++;
+    ClearBuffer();
+
+    // PrintChar
+    PrintChar(Str);
 
     // PrintNumber
-    Seg = 1;
     if (Data != INT32_MAX) {
         if (Data < 0) { negative = true; Data = -Data; }
         do {
@@ -137,5 +141,33 @@ void Disp_MAX7219_t::Print(const char *Str, int32_t Data, uint8_t Decade) {
             WriteRegister(Seg, DispBuffer[Seg-1]);
     }
 }
+#if !defined dmBCDcode
+void  Disp_MAX7219_t::PrintHex(const char *Str, int32_t HexData) {
+    uint8_t SymCode;
+    uint8_t Seg = 1;
+    bool negative = false;
+    ClearBuffer();
 
+    // PrintChar
+    PrintChar(Str);
+
+    // PrintNumber
+    if (HexData != INT32_MAX) {
+        if (HexData < 0) { negative = true; HexData = -HexData; }
+        do {
+            SymCode = SymCodeNum[HexData & 0b1111];
+            WriteBuffer(Seg, SymCode);
+            Seg++;
+            HexData >>= 4;
+        } while (HexData > 0);
+    }
+    if (negative) WriteBuffer(Seg, symMinus);
+
+    // Send Data
+    for (uint8_t Seg=1; Seg<=SegCount; Seg++) {
+        if ( !(chVTIsArmed(&TmrBlink) and Seg == SegBlinking) )       // если текущий сегмент не мигает
+            WriteRegister(Seg, DispBuffer[Seg-1]);
+    }
+}
+#endif
 

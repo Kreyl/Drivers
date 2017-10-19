@@ -87,6 +87,7 @@ enum SymCode_t {
     sym_t = 0b00001111,   // t
     sym_U = 0b00111110,   // U
     sym_u = 0b00011100,   // u
+    sym_Y = 0b00111011,   // Y
     sym_0 = 0b01111110,   // 0 O D
     sym_1 = 0b00110000,   // 1
     sym_2 = 0b01101101,   // 2
@@ -109,6 +110,12 @@ const uint8_t SymCodeNum[] = {
         0b01110000,   // 7
         0b01111111,   // 8
         0b01111011,   // 9
+        0b01110111,   // A
+        0b00011111,   // b
+        0b01001110,   // C
+        0b00111101,   // d
+        0b01001111,   // E
+        0b01000111,   // F
 };
 #endif
 
@@ -143,6 +150,7 @@ private:
         chVTSetI(&TmrBlink, MS2ST(BlinkInterval_MS), TmrKLCallback, this);
         BlinkTaskI();
     }
+    void PrintChar(const char *Str);
 
 public:
     void Init(const uint8_t ASegCount, const Intensity_t Intensity) {
@@ -170,6 +178,9 @@ public:
         }
     }
     void Print(const char *Str, int32_t Ddta = INT32_MAX, uint8_t Decade = 0);
+#if !defined dmBCDcode
+    void PrintHex(const char *Str, int32_t HexData = INT32_MAX);
+#endif
     void SetBlinking(const uint8_t ASegment) {
         chSysLock();
         if(chVTIsArmedI(&TmrBlink))
