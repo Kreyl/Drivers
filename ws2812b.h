@@ -18,11 +18,11 @@
 #include "ch.h"
 #include "hal.h"
 #include "kl_lib.h"
-#include "color.h"
 #include "uart.h"
 
+#ifndef LED_CNT
 #define LED_CNT             24   // Number of WS2812 LEDs
-
+#endif
 // Do not touch
 #define SEQ_LEN             4
 #define RST_W_CNT           4 // zero words before and after data to produce reset
@@ -31,6 +31,10 @@
 #define DATA_BIT_CNT        (LED_CNT * 3 * 8 * SEQ_LEN)   // Each led has 3 channels 8 bit each
 #define DATA_W_CNT          ((DATA_BIT_CNT + 15) / 16)
 #define TOTAL_W_CNT         (DATA_W_CNT + RST_W_CNT)
+
+typedef struct {
+    uint8_t R, G, B;
+} ColorWS_t;
 
 class IntelLeds_t {
 private:
@@ -42,12 +46,13 @@ public:
     void Init();
     bool AreOff() {
         for(uint8_t i=0; i<LED_CNT; i++) {
-            if(ICurrentClr[i] != clBlack) return false;
+            if(ICurrentClr[i].R != 0) return false;
+            if(ICurrentClr[i].G != 0) return false;
+            if(ICurrentClr[i].B != 0) return false;
         }
         return true;
     }
     // Inner use
-    Color_t ICurrentClr[LED_CNT];
+    ColorWS_t ICurrentClr[LED_CNT];
     void ISetCurrentColors();
-    void ITmrHandlerI();
 };

@@ -28,7 +28,7 @@ void IntelLeds_t::Init() {
     ISpi.Enable();
     ISpi.EnableTxDma();
 
-    Printf("Led BufSz=%u bytes\r", sizeof(IBuf));
+//    Uart.Printf("Led BufSz=%u bytes\r", sizeof(IBuf));
 
     // Zero buffer
     for(int i=0; i<TOTAL_W_CNT; i++) IBuf[i] = 0;
