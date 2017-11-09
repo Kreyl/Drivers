@@ -105,7 +105,7 @@ void Dial_t::IProcessSequenceI(DialerEvt_t DialerEvt) {
             break;
         case deSendEndEvt:
             EvtEndWasSend = false;
-            if(IPAppThd != nullptr) chEvtSignalI(IPAppThd, EvtEnd);
+            if(IPAppThd != nullptr and Number != 0) chEvtSignalI(IPAppThd, EvtEnd);
             break;
         default: break;
     }
