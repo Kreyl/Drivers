@@ -18,7 +18,7 @@ void Disp_MAX7219_t::PrintChar(const char *Str) {
     uint8_t SymCode;
     uint8_t Seg = SegCount;
 #if defined dmBCDcode
-    while (*Str != 0) {
+    while (*Str != 0 and Seg != 0) {
         switch (*Str) {
             case '-': SymCode = symMinus; break;
             case ' ': SymCode = symEmpty; break;
@@ -51,7 +51,7 @@ void Disp_MAX7219_t::PrintChar(const char *Str) {
         Seg --;
     }
 #elif defined dmNoDecode
-    while (*Str != 0) {
+    while (*Str != 0 and Seg != 0) {
         switch (*Str) {
             case '-': SymCode = symMinus; break;
             case '_': SymCode = symSpace; break;

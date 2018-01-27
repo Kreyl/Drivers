@@ -137,7 +137,8 @@ private:
         CsHi();                         // End transmission
     }
     void WriteBuffer (uint8_t AIndex, uint8_t AData) {
-        DispBuffer[AIndex-1] = AData;
+        if (AIndex <= SegCount)
+            DispBuffer[AIndex-1] = AData;
     }
     void ClearBuffer() {
         chSysLock();
