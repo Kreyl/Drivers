@@ -12,6 +12,12 @@ uint8_t i2c_t::Read(uint32_t Addr, uint8_t *RPtr, uint32_t RLength) {
     uint8_t Rslt;
     msg_t r;
     I2C_TypeDef *pi2c = PParams->pi2c;  // To make things shorter
+    if(RLength == 0 or RPtr == nullptr) { Rslt = retvCmdError; goto ReadEnd; }
+    if(IBusyWait() != retvOk) {
+        Rslt = retvBusy;
+        Uart.Printf("i2cW Busy\r");
+        goto ReadEnd;
+    }
     IReset(); // Reset I2C
     if(RLength != 0 and RPtr != nullptr) {
         // Prepare RX DMA
@@ -37,7 +43,7 @@ uint8_t i2c_t::Read(uint32_t Addr, uint8_t *RPtr, uint32_t RLength) {
         Rslt = retvTimeout;
     }
     else Rslt = (IState == istFailure)? retvFail : retvOk;
-    WriteReadEnd:
+    ReadEnd:
 #if I2C_USE_SEMAPHORE
     chBSemSignal(&BSemaphore);
 #endif
