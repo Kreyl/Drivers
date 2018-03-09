@@ -15,7 +15,7 @@ uint8_t i2c_t::Read(uint32_t Addr, uint8_t *RPtr, uint32_t RLength) {
     if(RLength == 0 or RPtr == nullptr) { Rslt = retvCmdError; goto ReadEnd; }
     if(IBusyWait() != retvOk) {
         Rslt = retvBusy;
-        Uart.Printf("i2cW Busy\r");
+        Uart.Printf("i2cR Busy\r");
         goto ReadEnd;
     }
     IReset(); // Reset I2C
