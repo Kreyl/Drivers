@@ -1,5 +1,5 @@
 /*
- * disp_MAX7219.h
+ * MAX7219.h
  *
  *  Created on: 02 апр. 2017 г.
  *      Author: Elessar, Eldalim

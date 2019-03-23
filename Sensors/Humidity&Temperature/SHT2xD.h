@@ -1,5 +1,5 @@
 /*
- * sens_SHT2xD.h
+ * SHT2xD.h
  *
  *  Created on: 18 апр. 2017 г.
  *      Author: Elessar, Eldalim

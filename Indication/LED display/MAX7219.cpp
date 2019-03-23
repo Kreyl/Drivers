@@ -1,11 +1,11 @@
 /*
- * disp_MAX7219.cpp
+ * MAX7219.cpp
  *
  *  Created on: 02 апр. 2017 г.
  *      Author: Elessar, Eldalim
  */
 
-#include "disp_MAX7219.h"
+#include "MAX7219.h"
 
 void Disp_MAX7219_t::BlinkTaskI() {
     static bool lit = true;
