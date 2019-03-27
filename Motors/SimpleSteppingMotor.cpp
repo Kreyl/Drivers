@@ -5,7 +5,7 @@
  *      Author: Elessar
  */
 
-#include "SteppingMotor.h"
+#include "SimpleSteppingMotor.h"
 
 void StepperTmrCallback(void *p) {
     chSysLockFromISR();
