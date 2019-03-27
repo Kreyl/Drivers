@@ -6,22 +6,24 @@
  */
 
 #include "radio_lvl1.h"
-#include "evt_mask.h"
-#include "application.h"
 #include "cc2500.h"
-#include "cmd_uart_f10x.h"
-#include <cstdlib>
+#include "MsgQ.h"
+#include "shell.h"
+#include "board.h"
 
-//#define TX
-//#define RX
+cc2500_t CC(CC_Setup0);
 
 //#define DBG_PINS
 
 #ifdef DBG_PINS
 #define DBG_GPIO1   GPIOB
-#define DBG_PIN1    10
-#define DBG1_SET()  PinSet(DBG_GPIO1, DBG_PIN1)
-#define DBG1_CLR()  PinClear(DBG_GPIO1, DBG_PIN1)
+#define DBG_PIN1    0
+#define DBG1_SET()  PinSetHi(DBG_GPIO1, DBG_PIN1)
+#define DBG1_CLR()  PinSetLo(DBG_GPIO1, DBG_PIN1)
+//#define DBG_GPIO2   GPIOB
+//#define DBG_PIN2    9
+//#define DBG2_SET()  PinSet(DBG_GPIO2, DBG_PIN2)
+//#define DBG2_CLR()  PinClear(DBG_GPIO2, DBG_PIN2)
 #else
 #define DBG1_SET()
 #define DBG1_CLR()
@@ -30,64 +32,49 @@
 rLevel1_t Radio;
 
 #if 1 // ================================ Task =================================
-static WORKING_AREA(warLvl1Thread, 256);
-__attribute__((noreturn))
+static THD_WORKING_AREA(warLvl1Thread, 256);
+__noreturn
 static void rLvl1Thread(void *arg) {
     chRegSetThreadName("rLvl1");
-    while(true) Radio.ITask();
+    Radio.ITask();
 }
 
+__noreturn
 void rLevel1_t::ITask() {
-#ifdef TX
-    PktTx.R = 0;
-    PktTx.G = 255;
-    PktTx.B = 0;
-    DBG1_SET();
-    CC.TransmitSync(&PktTx);
-    DBG1_CLR();
-#elif defined APP_NAME_CRYSTAL
-    // ======== RX cycle ========
-    int8_t Rssi;
-    uint8_t RxRslt = CC.ReceiveSync(RX_DURATION_MS, &PktRx, &Rssi);
-    if(RxRslt == OK) {
-        Uart.Printf("Rx: %u %u %u; Rssi=%d\r", PktRx.R, PktRx.G, PktRx.B, Rssi);
-        if((PktRx.AppID == R_APP_ID) and (Rssi > RSSI_MIN_DBM)) App.SendEvtRx(PktRx.R, PktRx.G, PktRx.B);
-    }
-    CC.Sleep();
-    chThdSleepMilliseconds(SLEEP_DURATION_MS);
-#elif defined APP_NAME_CANDLE
-    static bool InSleep = false;
-    if(App.DoTransmit) {
-        InSleep = false;
-        chSysLock();
-        App.Clr.Get(&PktTx.R, &PktTx.G, &PktTx.B);
-        chSysUnlock();
-        DBG1_SET();
-        CC.TransmitSync(&PktTx);
-        DBG1_CLR();
-    }
-    else {
-        if(!InSleep) CC.Sleep();
-        InSleep = true;
-        chThdSleepMilliseconds(540);
-    }
-#endif
+    while(true) {
+        uint8_t RxRslt = CC.Receive(999, &Pkt, &Rssi);
+        if(RxRslt == retvOk) {
+            Printf("Rx Rssi=%d\r", Rssi);
+            // Send message to main thd
+//            EvtMsg_t Msg(evtIdRadioCmd, Pkt.Btn);
+//            EvtQMain.SendNowOrExit(Msg);
+            // Report reception
+//            CC.Recalibrate();
+//            CC.Transmit(&Pkt);
+//            Printf("Tx\r");
+        } // if RxRslt ok
+//        else Printf("Rx\r");
+//        chThdSleepMilliseconds(11);
+    } // while
 }
 #endif // task
 
-#if 1 // ============================ Init =====================================
-void rLevel1_t::Init() {
+#if 1 // ============================
+uint8_t rLevel1_t::Init() {
 #ifdef DBG_PINS
     PinSetupOut(DBG_GPIO1, DBG_PIN1, omPushPull);
-#endif
-    // Init radioIC
-    CC.Init();
-    CC.SetTxPower(ccPwr0dBm);
-    CC.SetChannel(RCHANNEL);
-    CC.SetPktSize(RPKT_LEN);
-    // Variables
-    PktTx.AppID = R_APP_ID;
-    // Thread
-    chThdCreateStatic(warLvl1Thread, sizeof(warLvl1Thread), HIGHPRIO, (tfunc_t)rLvl1Thread, NULL);
+//    PinSetupOut(DBG_GPIO2, DBG_PIN2, omPushPull);
+#endif    // Init radioIC
+
+    if(CC.Init() == retvOk) {
+        CC.SetTxPower(ccPwr0dBm);
+        CC.SetPktSize(RPKT_LEN);
+        CC.SetChannel(RCHNL);
+        CC.Recalibrate();
+        // Thread
+        chThdCreateStatic(warLvl1Thread, sizeof(warLvl1Thread), HIGHPRIO, (tfunc_t)rLvl1Thread, NULL);
+        return retvOk;
+    }
+    else return retvFail;
 }
 #endif

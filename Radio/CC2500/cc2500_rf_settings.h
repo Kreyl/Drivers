@@ -13,18 +13,6 @@
 //#define CC_BITRATE_10K
 #define CC_BITRATE_250K
 
-// =================================== Power ===================================
-enum ccPwr_t {
-    ccPwrMinus30dBm = 0x50,
-    ccPwrMinus28dBm = 0x44,
-    ccPwrMinus8dBm  = 0x6E,
-    ccPwrMinus6dBm  = 0x7F,
-    ccPwrMinus4dBm  = 0xA9,
-    ccPwrMinus2dBm  = 0xBB,
-    ccPwr0dBm       = 0xFE,
-    ccPwrPlus1dBm   = 0xFF,
-};
-
 #define CC_PATABLE_INITIAL  ccPwr0dBm
 
 // ================================= Frequency =================================
@@ -35,8 +23,8 @@ enum ccPwr_t {
 
 // =================================== Common ==================================
 //#define CC_MDMCFG1_VALUE    0b10100010  // FEC=1, Preamble length=010 => 4bytes, +Channel spacing
-//#define CC_MDMCFG1_VALUE    0b10100011  // FEC=1, Preamble length=010 => 4bytes, +Channel spacing=11=MAX
-#define CC_MDMCFG1_VALUE    0b00100010  // FEC=0, Preamble length=010 => 4bytes, +Channel spacing
+#define CC_MDMCFG1_VALUE    0b10100011  // FEC=1, Preamble length=010 => 4bytes, +Channel spacing=11=MAX
+//#define CC_MDMCFG1_VALUE    0b00100010  // FEC=0, Preamble length=010 => 4bytes, +Channel spacing
 
 //#define CC_MCSM1_VALUE      0b00001100  // Channel is always clear, RX->RX,   TX->IDLE
 //#define CC_MCSM1_VALUE      0b00001111  // Channel is always clear, RX->RX,   TX->RX

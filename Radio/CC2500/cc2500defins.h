@@ -1,4 +1,4 @@
-/* 
+/*
  * File:   cc2500defins.h
  * Author: Kreyl Laurelindo
  *
@@ -9,6 +9,16 @@
 #define	_CC1101DEFINS_H
 
 #include <inttypes.h>
+
+// =================================== Power ===================================
+#define ccPwrMinus30dBm 0x50
+#define ccPwrMinus28dBm 0x44
+#define ccPwrMinus8dBm  0x6E
+#define ccPwrMinus6dBm  0x7F
+#define ccPwrMinus4dBm  0xA9
+#define ccPwrMinus2dBm  0xBB
+#define ccPwr0dBm       0xFE
+#define ccPwrPlus1dBm   0xFF
 
 // ======================= Registers, strobes etc. =============================
 // Flags
