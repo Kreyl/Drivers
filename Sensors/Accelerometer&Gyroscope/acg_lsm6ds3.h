@@ -17,19 +17,21 @@ struct AccSpd_t {
     void Print() { Printf("%d %d %d; %d %d %d\r", a[0],a[1],a[2], g[0],g[1],g[2]); }
 } __packed;
 
-class Acg_t : public IrqHandler_t {
+void AcgIrqHandler();
+
+class Acg_t {
 private:
     const PinIrq_t IIrq;
-    void IIrqHandler();
     void IWriteReg(uint8_t AAddr, uint8_t AValue);
     void IReadReg(uint8_t AAddr, uint8_t *PValue);
-    void IRead(uint8_t AAddr, void *ptr, uint8_t Len);
-    void IReadViaDMA(uint8_t AAddr, void *ptr, uint32_t Len);
 public:
     AccSpd_t AccSpd;
     void Init();
+    void Shutdown();
     void Task();
-    Acg_t() : IIrq(ACG_IRQ_PIN, pudPullDown, this) {}
+    const stm32_dma_stream_t *PDmaTx;
+    const stm32_dma_stream_t *PDmaRx;
+    Acg_t() : IIrq(ACG_IRQ_PIN, pudPullDown, AcgIrqHandler), AccSpd() {}
 };
 
 extern Acg_t Acg;

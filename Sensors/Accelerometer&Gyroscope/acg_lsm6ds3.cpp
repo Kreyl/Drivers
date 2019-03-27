@@ -9,36 +9,38 @@
 #include "MsgQ.h"
 #include "shell.h"
 #include "acg_lsm6ds3_defins.h"
+#include "board.h"
 
-#include "ahrsmath.h"
-#include "lightsaber.h"
+#include "radio_lvl1.h"
+
+#define LOG_TO_FILE             FALSE
+
+#define READ_FROM_FILE          FALSE// TRUE
 
 // SPI clock is up to 10MHz (ds p.26)
-#define ACG_MAX_BAUDRATE_HZ  10000000
+#define ACG_MAX_BAUDRATE_HZ     10000000
 
 Acg_t Acg;
-Spi_t ISpi {ACG_SPI};
+static Spi_t ISpi {ACG_SPI};
 static thread_reference_t ThdRef = nullptr;
-extern Lightsaber lightsaber;
 
-
-void ICsHi() { PinSetHi(ACG_CS_PIN); }
-void ICsLo() { PinSetLo(ACG_CS_PIN); }
+static inline void ICsHi() { PinSetHi(ACG_CS_PIN); }
+static inline void ICsLo() { PinSetLo(ACG_CS_PIN); }
 
 // DMA reception complete
 extern "C"
 void AcgDmaRxCompIrq(void *p, uint32_t flags) {
     ICsHi();
     // Disable DMA
-    dmaStreamDisable(ACG_DMA_TX);
-    dmaStreamDisable(ACG_DMA_RX);
+    dmaStreamDisable(Acg.PDmaTx);
+    dmaStreamDisable(Acg.PDmaRx);
     chSysLockFromISR();
     chThdResumeI(&ThdRef, MSG_OK);
     chSysUnlockFromISR();
 }
 
 // Thread
-static THD_WORKING_AREA(waAcgThread, 8192);
+static THD_WORKING_AREA(waAcgThread, 512);
 __noreturn
 static void AcgThread(void *arg) {
     chRegSetThreadName("Acg");
@@ -47,20 +49,34 @@ static void AcgThread(void *arg) {
 
 __noreturn
 void Acg_t::Task() {
+#if READ_FROM_FILE
+    bool Done = false;
+#endif
     while(true) {
-        systime_t t = chVTGetSystemTimeX();
         chSysLock();
         chThdSuspendS(&ThdRef); // Wait IRQ
         chSysUnlock();
+
+        rPkt_t IPkt;
+        IPkt.Time = chVTGetSystemTimeX() / 10;
+        IPkt.Btn = PinIsHi(GPIOA, 0);
+
+        IPkt.acc[0] = AccSpd.a[0];
+        IPkt.acc[1] = AccSpd.a[1];
+        IPkt.acc[2] = AccSpd.a[2];
+
+        IPkt.gyro[0] = AccSpd.g[0];
+        IPkt.gyro[1] = AccSpd.g[1];
+        IPkt.gyro[2] = AccSpd.g[2];
+
+        chSysLock();
+        Radio.TxBuf.PutI(IPkt);
+        chSysUnlock();
+
 //        AccSpd.Print();
-        systime_t Elapsed = chVTTimeElapsedSinceX(t);
-        float us = ST2US(Elapsed);
-        float dt = us / 1000000.0;
-        Vector vectorAcc(1, 0, 0);
-        Vector vectorMag(1, 0, 0);
-        Vector VectorG(AccSpd.g[0], AccSpd.g[1], AccSpd.g[2]);
-        lightsaber.setData(dt, vectorAcc, VectorG, vectorMag);
-//        Printf("a\r");
+
+        // Detect motion
+//        SaberMotn.Update(AccSpd.a, AccSpd.g);
     }
 }
 
@@ -78,23 +94,7 @@ void Acg_t::Init() {
     chThdSleepMilliseconds(18);
 #endif
 #if 1 // ==== SPI ====    MSB first, master, ClkIdleHigh, FirstEdge
-    uint32_t div;
-#if defined STM32L1XX || defined STM32F4XX || defined STM32L4XX
-    if(ACG_SPI == SPI1) div = Clk.APB2FreqHz / ACG_MAX_BAUDRATE_HZ;
-    else div = Clk.APB1FreqHz / ACG_MAX_BAUDRATE_HZ;
-#elif defined STM32F030 || defined STM32F0
-    div = Clk.APBFreqHz / PN_MAX_BAUDRATE_HZ;
-#endif
-    SpiClkDivider_t ClkDiv = sclkDiv2;
-    if     (div > 128) ClkDiv = sclkDiv256;
-    else if(div > 64) ClkDiv = sclkDiv128;
-    else if(div > 32) ClkDiv = sclkDiv64;
-    else if(div > 16) ClkDiv = sclkDiv32;
-    else if(div > 8)  ClkDiv = sclkDiv16;
-    else if(div > 4)  ClkDiv = sclkDiv8;
-    else if(div > 2)  ClkDiv = sclkDiv4;
-
-    ISpi.Setup(boMSB, cpolIdleHigh, cphaSecondEdge, ClkDiv);
+    ISpi.Setup(boMSB, cpolIdleHigh, cphaSecondEdge, ACG_MAX_BAUDRATE_HZ);
     ISpi.EnableRxDma();
     ISpi.EnableTxDma();
     ISpi.Enable();
@@ -135,15 +135,26 @@ void Acg_t::Init() {
 #endif
 #if 1 // ==== DMA ====
     // Tx
-    dmaStreamAllocate(ACG_DMA_TX, IRQ_PRIO_MEDIUM, nullptr, nullptr);
-    dmaStreamSetPeripheral(ACG_DMA_TX, &ACG_SPI->DR);
+    PDmaTx = dmaStreamAlloc(ACG_DMA_TX, IRQ_PRIO_MEDIUM, nullptr, nullptr);
+    dmaStreamSetPeripheral(PDmaTx, &ACG_SPI->DR);
     // Rx
-    dmaStreamAllocate(ACG_DMA_RX, IRQ_PRIO_MEDIUM, AcgDmaRxCompIrq, nullptr);
-    dmaStreamSetPeripheral(ACG_DMA_RX, &ACG_SPI->DR);
+    PDmaRx = dmaStreamAlloc(ACG_DMA_RX, IRQ_PRIO_MEDIUM, AcgDmaRxCompIrq, nullptr);
+    dmaStreamSetPeripheral(PDmaRx, &ACG_SPI->DR);
 #endif
     // Thread
     chThdCreateStatic(waAcgThread, sizeof(waAcgThread), NORMALPRIO, (tfunc_t)AcgThread, NULL);
     IIrq.EnableIrq(IRQ_PRIO_MEDIUM);
+    Printf("IMU Init Done\r", b);
+#if LOG_TO_FILE
+    TryOpenFileRewrite(IFILENAME, &ImuFile);
+#endif
+#if READ_FROM_FILE
+    Printf("Opening %S\r", IFILENAME);
+    csv::OpenFile(IFILENAME);
+#endif
+}
+
+void Acg_t::Shutdown() {
 }
 
 #if 1 // =========================== Low level =================================
@@ -161,67 +172,19 @@ void Acg_t::IReadReg(uint8_t AAddr, uint8_t *PValue) {
     ICsHi();
 }
 
-void Acg_t::IRead(uint8_t AAddr, void *ptr, uint8_t Len) {
-    uint8_t *p = (uint8_t*)ptr;
-    ICsLo();
-    ISpi.ReadWriteByte(AAddr | 0x80);   // Add "Read" bit
-    while(Len-- > 0) {
-        *p++ = ISpi.ReadWriteByte(0);
-    }
-    ICsHi();
-}
-
-void Acg_t::IReadViaDMA(uint8_t AAddr, void *ptr, uint32_t Len) {
-    AAddr |= 0x80;  // Add "Read" bit
-    ICsLo();
-    chSysLock();
-    // RX
-    dmaStreamSetMemory0(ACG_DMA_RX, ptr);
-    dmaStreamSetTransactionSize(ACG_DMA_RX, Len);
-    dmaStreamSetMode(ACG_DMA_RX, ACG_DMA_RX_MODE);
-    dmaStreamEnable(ACG_DMA_RX);
-    // TX
-    dmaStreamSetMemory0(ACG_DMA_TX, &AAddr);
-    dmaStreamSetTransactionSize(ACG_DMA_TX, Len);
-    dmaStreamSetMode(ACG_DMA_TX, ACG_DMA_TX_MODE);
-    dmaStreamEnable(ACG_DMA_TX);
-    chSysUnlock();
-}
-
 const uint8_t SAddr = 0x3E | 0x80; // Add "Read" bit
-void Acg_t::IIrqHandler() {
-//    PrintfI("i\r");
+
+void AcgIrqHandler() {
     ICsLo();
     // RX
-    dmaStreamSetMemory0(ACG_DMA_RX, &AccSpd);
-    dmaStreamSetTransactionSize(ACG_DMA_RX, sizeof(AccSpd_t));
-    dmaStreamSetMode(ACG_DMA_RX, ACG_DMA_RX_MODE);
-    dmaStreamEnable(ACG_DMA_RX);
+    dmaStreamSetMemory0(Acg.PDmaRx, &Acg.AccSpd);
+    dmaStreamSetTransactionSize(Acg.PDmaRx, sizeof(AccSpd_t));
+    dmaStreamSetMode(Acg.PDmaRx, ACG_DMA_RX_MODE);
+    dmaStreamEnable(Acg.PDmaRx);
     // TX
-    dmaStreamSetMemory0(ACG_DMA_TX, &SAddr);
-    dmaStreamSetTransactionSize(ACG_DMA_TX, sizeof(AccSpd_t));
-    dmaStreamSetMode(ACG_DMA_TX, ACG_DMA_TX_MODE);
-    dmaStreamEnable(ACG_DMA_TX);
-
-//    chThdResumeI(&ThdRef, MSG_OK);
+    dmaStreamSetMemory0(Acg.PDmaTx, &SAddr);
+    dmaStreamSetTransactionSize(Acg.PDmaTx, sizeof(AccSpd_t));
+    dmaStreamSetMode(Acg.PDmaTx, ACG_DMA_TX_MODE);
+    dmaStreamEnable(Acg.PDmaTx);
 }
 #endif
-
-Vector getGOffset() {
-    Vector vector(50, -61, -56);
-    return vector;
-}
-
-Vector getAOffset() {
-    Vector vector(0);
-    return vector;
-}
-
-Vector getMOffset() {
-    Vector vector(0);
-    return vector;
-}
-
-void onCalibrationDone() {
-
-}
