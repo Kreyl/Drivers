@@ -7,35 +7,32 @@
 
 #include "ads8320.h"
 #include "uart.h"
-#include "core_cmInstr.h"
 #include "main.h"
 
 Adc_t Adc;
 
-extern "C" {
 // DMA irq
+extern "C"
 void SIrqDmaHandler(void *p, uint32_t flags) { Adc.IrqDmaHandler(); }
-} // extern c
 
 void Adc_t::Init() {
-    PinSetupOut(ADC_GPIO, ADC_CSIN_PIN, omPushPull, pudNone);
-    PinSetupAlterFunc(ADC_GPIO, ADC_SCK_PIN, omPushPull, pudNone, ADC_SPI_AF);
-    PinSetupAlterFunc(ADC_GPIO, ADC_DOUT_PIN, omPushPull, pudNone, ADC_SPI_AF);
-    CsHi();
+    PinSetupOut(ADC_CS, omPushPull);
+    PinSetupAlterFunc(ADC_CLK, omPushPull, pudNone, AF5);
+    PinSetupAlterFunc(ADC_MISO, omPushPull, pudNone, AF5);
+    CskHi();
     // ==== SPI ====    MSB first, master, ClkLowIdle, FirstEdge, Baudrate=...
-    // Select baudrate (2.4MHz max): APB=32MHz => div = 16
-    ISpi.Setup(SPI_ADC, boMSB, cpolIdleLow, cphaFirstEdge, sbFdiv16);
+    // Select baudrate (2.4MHz max)
+    ISpi.Setup(boMSB, cpolIdleLow, cphaFirstEdge, 2400000);
     ISpi.SetRxOnly();
     ISpi.EnableRxDma();
     // ==== DMA ====
-    dmaStreamAllocate     (DMA_ADC, IRQ_PRIO_MEDIUM, SIrqDmaHandler, NULL);
-    dmaStreamSetPeripheral(DMA_ADC, &SPI_ADC->DR);
-    dmaStreamSetMode      (DMA_ADC, ADC_DMA_MODE);
+    PDma = dmaStreamAlloc(ADC_DMA, IRQ_PRIO_MEDIUM, SIrqDmaHandler, nullptr);
+    dmaStreamSetPeripheral(PDma, &ADC_SPI->DR);
+    dmaStreamSetMode      (PDma, ADC_DMA_MODE);
 }
 
 uint16_t Adc_t::Measure() {
-    ISpi.Enable();
-    CsLo();
+    CskLo();
     uint8_t b;
     uint32_t r = 0;
     b = ISpi.ReadWriteByte(0);
@@ -44,33 +41,32 @@ uint16_t Adc_t::Measure() {
     r = (r << 8) | b;
     b = ISpi.ReadWriteByte(0);
     r = (r << 8) | b;
-    CsHi();
-    ISpi.Disable();
+    CskHi();
     r >>= 2;
     r &= 0xFFFF;
     return r;
 }
 
 void Adc_t::StartDMAMeasure() {
-    (void)SPI_ADC->DR;  // Clear input register
-    dmaStreamSetMemory0(DMA_ADC, &IRslt);
-    dmaStreamSetTransactionSize(DMA_ADC, 3);
-    dmaStreamSetMode(DMA_ADC, ADC_DMA_MODE);
-    dmaStreamEnable(DMA_ADC);
-    CsLo();
+    (void)ADC_SPI->DR;  // Clear input register
+    dmaStreamSetMemory0(PDma, &IRslt);
+    dmaStreamSetTransactionSize(PDma, 3);
+    dmaStreamSetMode(PDma, ADC_DMA_MODE);
+    dmaStreamEnable(PDma);
+    CskLo();
     ISpi.Enable();
 }
 
 void Adc_t::IrqDmaHandler() {
     chSysLockFromISR();
     ISpi.Disable();
-    CsHi();
-    dmaStreamDisable(DMA_ADC);
+    CskHi();
+    dmaStreamDisable(PDma);
     IRslt = __REV(IRslt);
     IRslt >>= 10;
     IRslt &= 0xFFFF;
     Rslt = IRslt;
-//    Uart.PrintfI("%u\r", Rslt);
-    App.SignalEvtI(EVTMSK_ADC_DONE);
+//    Uart.Printf("%u\r", Rslt);
+    OnAdcMeasurementDoneI();
     chSysUnlockFromISR();
 }
