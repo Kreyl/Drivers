@@ -5,7 +5,7 @@
  *      Author: Elessar
  */
 
-#include "SimpleSteppingMotor.h"
+#include "SteppingMotor.h"
 
 void StepperTmrCallback(void *p) {
     chSysLockFromISR();
@@ -25,24 +25,24 @@ void SteppingMotor_t::SetSpeed(int32_t Speed, const StepMode_t Mode = smLikeBefo
         switch(MotorMode) {
             case smFullStep:
                 Steps_CNT = 3;
-                StepInterval_ms = (uint32_t)(1000*60*StepAngle*10)/(360 * GearRatio * Speed);
+                StepInterval_us = (1000000UL*StepAngle*10)/(6U * GearRatio * Speed); // (1000000UL*60*StepAngle*10)/(360UL * GearRatio * Speed)
                 break;
             case smHalfStep:
                 Steps_CNT = 7;
-                StepInterval_ms = (uint32_t)(1000*60*StepAngle*5)/(360 * GearRatio * Speed);
+                StepInterval_us = (1000000UL*StepAngle*5)/(6U * GearRatio * Speed);
                 break;
             default: break;
         }         // обороты в минуту /10 -> интервал между шагами [mS]
     }
-    if (StepInterval_ms == 0) {
-        StepInterval_ms = 1;
-        Uart.Printf("StepInterval LIM MIN (1mS)\r");
+    if (StepInterval_us < StepInterval_MIN_US) {
+        StepInterval_us = StepInterval_MIN_US;
+        Uart.Printf("Motor StepInterval LIM MIN (%uuS), Speed %u\r", StepInterval_MIN_US, Speed);
     }
-    else if (StepInterval_ms > StepInterval_MAX_MS) {
-        StepInterval_ms = StepInterval_MAX_MS;
-        Uart.Printf("StepInterval LIM MAX (%umS)\r", StepInterval_MAX_MS);
+    else if (StepInterval_us > StepInterval_MAX_US) {
+        StepInterval_us = StepInterval_MAX_US;
+        Uart.Printf("Motor StepInterval LIM MAX (%uuS), Speed %u\r", StepInterval_MAX_US, Speed);
     }
-    else Uart.Printf("Step Interval %u mS\r", StepInterval_ms);
+    else Uart.Printf("Motor StepInterval %uuS, Speed %u\r", StepInterval_us, Speed);
 }
 
 void SteppingMotor_t::TaskI() {
@@ -129,8 +129,6 @@ void SteppingMotor_t::TaskI() {
                 break;
         }
     }
-
-//    Uart.PrintfI("StepIndex %u\r", StepIndex);
 
     switch(Rotation) {
         case srClockwise:

@@ -8,7 +8,6 @@
 #include "RotaryDial.h"
 
 Dial_t Dialer;
-PinIrq_t DialIRQ(Dial_Namber_GPIO, Dial_Namber_PIN, pudPullUp);
 
 // ======================== VirtualTimers callback =============================
 void LockTmrCallback(void *p) {
@@ -25,26 +24,6 @@ void SendEvtTmrCallback(void *p) {
     chSysLockFromISR();
     ((Dial_t*)p)->IProcessSequenceI(deSendEndEvt);
     chSysUnlockFromISR();
-}
-
-// ================================= IRQ =======================================
-extern "C" {
-// IRQ
-CH_IRQ_HANDLER(DIAL_IRQ_HANDLER) {
-//    Uart.PrintfNow("IRQ %d %d\r", ch.dbg.isr_cnt, ch.dbg.lock_cnt);
-    CH_IRQ_PROLOGUE();
-    chSysLockFromISR();
-    Dialer.IIrqPinHandler();
-    chSysUnlockFromISR();
-    CH_IRQ_EPILOGUE();
-}
-} // extern c
-void Dial_t::IIrqPinHandler() {     // Interrupt caused by Low level on IRQ_Pin
-    DialIRQ.CleanIrqFlag();         // Clear IRQ Pending Bit
-    DialIRQ.DisableIrq();           // Disable IRQ
-    Numeral ++;
-//    Uart.PrintfI("  IRQ nam %u\r", Numeral);
-    chVTSetI(&LockTmr, MS2ST(IRQ_En_Delay_MS), LockTmrCallback, this);
 }
 
 // =========================== Implementation ==================================

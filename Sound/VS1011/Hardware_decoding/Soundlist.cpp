@@ -81,12 +81,8 @@ void SndList_t::PlayRandomFileFromDir(const char* DirName) {
                     else Counter++;
                 }
             } // if Len>4
-        } // Filename o
+        } // Filename ok
     } // while true
-}
-void SndList_t::DelayAndPlayRandomFileFromDir(const systime_t Delay_MS, const char* DirName) {
-    chThdSleepMilliseconds(Delay_MS);
-    PlayRandomFileFromDir(DirName);
 }
 
 int SndList_t::DirIndxInList(const char* DirName) {
@@ -107,4 +103,30 @@ int SndList_t::AddDirToList(const char* DirName) {
     DirList[indx].LastN = -1;
     DirList[indx].FilesCnt = 0;
     return indx;
+}
+
+void SndList_t::SetPreviousTrack(const char* DirName, const char* FileName) {
+    int indx = DirIndxInList(DirName);
+    if(indx == -1) {
+        indx = AddDirToList(DirName);
+        FRESULT Rslt = CountFilesInDir(DirName, &DirList[indx].FilesCnt);
+        if(Rslt != FR_OK) return;
+    }
+    // track search
+    int32_t Counter = 0;
+    FRESULT Rslt = f_opendir(&Dir, DirName);
+    if(Rslt != FR_OK) return;
+    while(true) {
+        Rslt = f_readdir(&Dir, &FileInfo);
+        if(Rslt != FR_OK) return;
+        if((FileInfo.fname[0] == 0) and (FileInfo.lfname[0] == 0)) return;  // somehow no files left
+        else { // Filename ok, check if not dir
+            if(FileInfo.fattrib & (AM_HID | AM_DIR)) continue; // Ignore hidden files and dirs
+            // Check File name
+            char *FName = (FileInfo.lfname[0] == 0)? FileInfo.fname : FileInfo.lfname;
+            if(strcasecmp(FName, FileName) == 0)
+                DirList[indx].LastN = Counter;
+            else Counter++;
+        } // Filename ok
+    } // while true
 }

@@ -41,19 +41,6 @@
                         STM32_DMA_CR_PSIZE_BYTE | \
                         STM32_DMA_CR_DIR_M2P |    /* Direction is memory to peripheral */ \
                         STM32_DMA_CR_TCIE         /* Enable Transmission Complete IRQ */
-// === EXTI IRQ Handler ===
-#if VS_DREQ == 0
-#define VS_IRQ_HANDLER    Vector58
-#elif VS_DREQ == 1
-#define VS_IRQ_HANDLER    Vector5C
-#elif VS_DREQ == 2
-#define VS_IRQ_HANDLER    Vector60
-#elif VS_DREQ == 3
-#define VS_IRQ_HANDLER    Vector64
-#elif VS_DREQ == 4
-#define VS_IRQ_HANDLER    Vector68
-#endif
-
 
 // Command codes
 #define VS_READ_OPCODE  0b00000011
@@ -107,12 +94,11 @@ struct VsBuf_t {
 #define VS_EVT_DMA_DONE     (eventmask_t)8
 #define VS_EVT_DREQ_IRQ     (eventmask_t)16
 
-extern PinIrq_t IDreq;
 extern Spi_t ISpi;
 
-class Sound_t {
+class Sound_t : public IrqHandler_t {
 private:
-//    Spi_t ISpi;
+    PinIrq_t IDreq{VS_GPIO, VS_DREQ, pudPullDown, this};
     msg_t CmdBuf[VS_CMD_BUF_SZ];
     mailbox_t CmdBox;
     VsCmd_t ICmd;
@@ -140,7 +126,7 @@ private:
         chSysLock();
         if(IDmaIdle and IDreq.IsHi()) {
 //            Uart.PrintfI("\rTXinB");
-            IDreq.EnableIrq(IRQ_PRIO_MEDIUM);
+            IDreq.EnableIrq(IRQ_PRIO_HIGH);
             IDreq.GenerateIrq();    // Do not call SendNexData directly because of its interrupt context
         }
         chSysUnlock();
@@ -214,9 +200,12 @@ public:
 #endif
     // Inner use
     thread_t *PThread;
-    void IrqDreqHandler();
     void ITask();
     void ISendNextData();
+    void IIrqHandler() {
+//        Uart.PrintfNow("IRQ %d %d\r", ch.dbg.isr_cnt, ch.dbg.lock_cnt);
+        chEvtSignalI(PThread, VS_EVT_DREQ_IRQ);
+    }
 };
 
 extern Sound_t Sound;

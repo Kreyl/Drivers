@@ -11,20 +11,6 @@
 #include "board.h"
 #include "kl_lib.h"
 
-// === EXTI IRQ Handler ===
-#if Dial_Namber_PIN == 0
-#define DIAL_IRQ_HANDLER  Vector58
-#elif Dial_Namber_PIN == 1
-#define DIAL_IRQ_HANDLER  Vector5C
-#elif Dial_Namber_PIN == 2
-#define DIAL_IRQ_HANDLER  Vector60
-#elif Dial_Namber_PIN == 3
-#define DIAL_IRQ_HANDLER  Vector64
-#elif Dial_Namber_PIN == 4
-#define DIAL_IRQ_HANDLER  Vector68
-#else
-#error "RotaryDial.h: not selected IRQ pin"
-#endif
 
 #define HexadecimalOut          TRUE    // Example: number "03" = 0xA3
 /* else Decimal Output */
@@ -43,8 +29,9 @@ void DiskTmrCallback(void *p);
 void SendEvtTmrCallback(void *p);
 
 
-class Dial_t {
+class Dial_t : public IrqHandler_t {
 private:
+    PinIrq_t DialIRQ { Dial_Namber_GPIO, Dial_Namber_PIN, pudPullUp, this };
     uint8_t Numeral = 0;
     uint64_t Number = 0;
     virtual_timer_t LockTmr, DiskTmr, SendEvtTmr;
@@ -83,7 +70,13 @@ public:
     }
     // Inner use
     void IProcessSequenceI(DialerEvt_t DialerEvt);
-    inline void IIrqPinHandler();
+    inline void IIrqHandler() {
+        DialIRQ.CleanIrqFlag();         // Clear IRQ Pending Bit
+        DialIRQ.DisableIrq();           // Disable IRQ
+        Numeral ++;
+    //    Uart.PrintfI("  IRQ nam %u\r", Numeral);
+        chVTSetI(&LockTmr, MS2ST(IRQ_En_Delay_MS), LockTmrCallback, this);
+    }
 };
 
 extern Dial_t Dialer;

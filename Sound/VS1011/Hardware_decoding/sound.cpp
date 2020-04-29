@@ -6,7 +6,6 @@
 
 Sound_t Sound;
 Spi_t ISpi(VS_SPI);
-PinIrq_t IDreq(VS_GPIO, VS_DREQ, pudPullDown);
 
 // Mode register
 //#define VS_MODE_REG_VALUE   0x0802  // Native SDI mode, Layer I + II enabled
@@ -20,17 +19,6 @@ static uint8_t ReadWriteByte(uint8_t AByte);
 
 // ================================= IRQ =======================================
 extern "C" {
-// Dreq IRQ
-CH_IRQ_HANDLER(VS_IRQ_HANDLER) {
-//    Uart.PrintfNow("IRQ %d %d\r", ch.dbg.isr_cnt, ch.dbg.lock_cnt);
-    CH_IRQ_PROLOGUE();
-    chSysLockFromISR();
-    IDreq.CleanIrqFlag();
-    IDreq.DisableIrq();
-    chEvtSignalI(Sound.PThread, VS_EVT_DREQ_IRQ);
-    chSysUnlockFromISR();
-    CH_IRQ_EPILOGUE();
-}
 // DMA irq
 void SIrqDmaHandler(void *p, uint32_t flags) {
     chSysLockFromISR();
@@ -40,7 +28,7 @@ void SIrqDmaHandler(void *p, uint32_t flags) {
 } // extern c
 
 // =========================== Implementation ==================================
-static THD_WORKING_AREA(waSoundThread, 1024); // 512
+static THD_WORKING_AREA(waSoundThread, 512);
 __attribute__((noreturn))
 static void SoundThread(void *arg) {
     chRegSetThreadName("Sound");
@@ -163,7 +151,7 @@ void Sound_t::IPlayNew() {
 //    Uart.Printf("Play %S at %u\r", IFilename, IStartPosition);
     rslt = f_open(&IFile, IFilename, FA_READ+FA_OPEN_EXISTING);
     if(rslt != FR_OK) {
-        if (rslt == FR_NO_FILE) Uart.Printf("%S: not found\r", IFilename);
+        if (rslt == FR_NO_FILE) Uart.Printf("Sound: %S not found\r", IFilename);
         else Uart.Printf("OpenFile error: %u\r", rslt);
         IFilename = NULL;
         Stop();

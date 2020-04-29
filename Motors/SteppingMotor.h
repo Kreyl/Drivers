@@ -22,7 +22,8 @@
 //#define FullStep_CNT    countof(FullStepOperation)
 //#define HalfStep_CNT    8
 
-#define StepInterval_MAX_MS 500
+#define StepInterval_MAX_US 500000
+#define StepInterval_MIN_US 250
 #define InintTimeOut_MS     1500
 
 struct MotorSetupPins_t {
@@ -44,7 +45,7 @@ class SteppingMotor_t {
 private:
     virtual_timer_t StepTMR;
     uint8_t StepIndex = 0;
-    systime_t StepInterval_ms = 30;
+    systime_t StepInterval_us = 30000;
     uint8_t Steps_CNT = 3;
     StepMode_t MotorMode = smFullStep;
     Rotation_t Rotation = srClockwise;
@@ -56,7 +57,7 @@ private:
 
     void StepperTmrStsrtI(){
         if(chVTIsArmedI(&StepTMR)) chVTResetI(&StepTMR);
-        chVTSetI(&StepTMR, MS2ST(StepInterval_ms), StepperTmrCallback, this);
+        chVTSetI(&StepTMR, US2ST(StepInterval_us), StepperTmrCallback, this);
     }
     void TaskI();
 
@@ -86,10 +87,10 @@ public:
         int32_t Result = 0;
         switch(MotorMode) {
             case smFullStep:
-                Result = (uint32_t)(1000*60*StepAngle*10)/(360 * GearRatio * StepInterval_ms);
+                Result = (1000000UL*StepAngle*10)/(6U * GearRatio * StepInterval_us);
                 break;
             case smHalfStep:
-                Result = (uint32_t)(1000*60*StepAngle*5)/(360 * GearRatio * StepInterval_ms);
+                Result = (1000000UL*StepAngle*5)/(6U * GearRatio * StepInterval_us);
                 break;
             default: break;
         }
