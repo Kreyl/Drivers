@@ -128,7 +128,7 @@ void Sound_t::Init() {
     // ==== DREQ IRQ ====
     IDreq.Init(ttRising);
     // ==== Thread ====
-    PThread = chThdCreateStatic(waSoundThread, sizeof(waSoundThread), NORMALPRIO, (tfunc_t)SoundThread, NULL);
+    PThread = chThdCreateStatic(waSoundThread, sizeof(waSoundThread), HIGHPRIO, (tfunc_t)SoundThread, NULL);
     StartTransmissionIfNotBusy();   // Send init commands
 }
 

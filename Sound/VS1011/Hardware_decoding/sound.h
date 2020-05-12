@@ -126,7 +126,7 @@ private:
         chSysLock();
         if(IDmaIdle and IDreq.IsHi()) {
 //            Uart.PrintfI("\rTXinB");
-            IDreq.EnableIrq(IRQ_PRIO_HIGH);
+            IDreq.EnableIrq(IRQ_PRIO_MEDIUM);
             IDreq.GenerateIrq();    // Do not call SendNexData directly because of its interrupt context
         }
         chSysUnlock();
