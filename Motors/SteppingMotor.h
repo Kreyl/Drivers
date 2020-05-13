@@ -45,7 +45,7 @@ class SteppingMotor_t {
 private:
     virtual_timer_t StepTMR;
     uint8_t StepIndex = 0;
-    systime_t StepInterval_us = 30000;
+    systime_t StepInterval_us = 0;
     uint8_t Steps_CNT = 3;
     StepMode_t MotorMode = smFullStep;
     Rotation_t Rotation = srClockwise;
@@ -56,8 +56,10 @@ private:
     uint16_t GearRatio = 100;
 
     void StepperTmrStsrtI(){
-        if(chVTIsArmedI(&StepTMR)) chVTResetI(&StepTMR);
-        chVTSetI(&StepTMR, US2ST(StepInterval_us), StepperTmrCallback, this);
+        if (StepInterval_us) {
+            if(chVTIsArmedI(&StepTMR)) chVTResetI(&StepTMR);
+            chVTSetI(&StepTMR, US2ST(StepInterval_us), StepperTmrCallback, this);
+        }
     }
     void TaskI();
 
@@ -85,15 +87,16 @@ public:
     void SetSpeed(int32_t Speed, const StepMode_t Mode);
     int32_t GetSpeed() {
         int32_t Result = 0;
-        switch(MotorMode) {
-            case smFullStep:
-                Result = (1000000UL*StepAngle*10)/(6U * GearRatio * StepInterval_us);
-                break;
-            case smHalfStep:
-                Result = (1000000UL*StepAngle*5)/(6U * GearRatio * StepInterval_us);
-                break;
-            default: break;
-        }
+        if (StepInterval_us)
+            switch(MotorMode) {
+                case smFullStep:
+                    Result = (1000000UL*StepAngle*10)/(6U * GearRatio * StepInterval_us);
+                    break;
+                case smHalfStep:
+                    Result = (1000000UL*StepAngle*5)/(6U * GearRatio * StepInterval_us);
+                    break;
+                default: break;
+            }
         if (Rotation == srReverse) return -Result;
         else return Result;
     }

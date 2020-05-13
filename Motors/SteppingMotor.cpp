@@ -17,10 +17,11 @@ void StepperTmrCallback(void *p) {
 void SteppingMotor_t::SetSpeed(int32_t Speed, const StepMode_t Mode = smLikeBefore) {     // [об/мин * 0,1]
 //    Start();
 
+    MotorMode = Mode;
+
     if (Speed > 0) Rotation = srClockwise;
     else if (Speed < 0) { Rotation = srReverse; Speed *= -1; }
 
-    MotorMode = Mode;
     if (Speed != 0){
         switch(MotorMode) {
             case smFullStep:
@@ -33,16 +34,19 @@ void SteppingMotor_t::SetSpeed(int32_t Speed, const StepMode_t Mode = smLikeBefo
                 break;
             default: break;
         }         // обороты в минуту /10 -> интервал между шагами [mS]
+        if (StepInterval_us < StepInterval_MIN_US) {
+            StepInterval_us = StepInterval_MIN_US;
+            Uart.Printf("Motor StepInterval LIM MIN (%uuS), Speed %u\r", StepInterval_MIN_US, Speed);
+        }
+        else if (StepInterval_us > StepInterval_MAX_US) {
+            StepInterval_us = StepInterval_MAX_US;
+            Uart.Printf("Motor StepInterval LIM MAX (%uuS), Speed %u\r", StepInterval_MAX_US, Speed);
+        }
+        else Uart.Printf("Motor StepInterval %uuS, Speed %u\r", StepInterval_us, Speed);
+    } else {
+        StepInterval_us = 0;
+        Uart.Printf("Motor Speed = 0; Motor OFF\r");
     }
-    if (StepInterval_us < StepInterval_MIN_US) {
-        StepInterval_us = StepInterval_MIN_US;
-        Uart.Printf("Motor StepInterval LIM MIN (%uuS), Speed %u\r", StepInterval_MIN_US, Speed);
-    }
-    else if (StepInterval_us > StepInterval_MAX_US) {
-        StepInterval_us = StepInterval_MAX_US;
-        Uart.Printf("Motor StepInterval LIM MAX (%uuS), Speed %u\r", StepInterval_MAX_US, Speed);
-    }
-    else Uart.Printf("Motor StepInterval %uuS, Speed %u\r", StepInterval_us, Speed);
 }
 
 void SteppingMotor_t::TaskI() {
