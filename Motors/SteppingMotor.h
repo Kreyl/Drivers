@@ -77,7 +77,7 @@ public:
         StepAngle = AStepAngle;
         GearRatio = AGearRatio;
         Uart.Printf("MotorAngle=%u, MotorRatio=%u\r", MotorAngle, MotorRatio);
-        if (Delay) chThdSleepMicroseconds(InintTimeOut_MS);
+        if (Delay) chThdSleepMilliseconds(InintTimeOut_MS);
     }
     void Start() {
         chSysLock();
