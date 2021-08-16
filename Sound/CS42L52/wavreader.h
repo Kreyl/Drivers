@@ -5,6 +5,8 @@
 
 #include "audioreader.h"
 
+#define HAS_IEEE_FLOAT
+
 #ifndef WAVREADER_BUFFER_SIZE
 #define WAVREADER_BUFFER_SIZE 2048
 #endif
