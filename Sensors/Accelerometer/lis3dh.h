@@ -5,17 +5,18 @@
  *      Author: Kreyl
  */
 
-#pragma once
+#ifndef LIS3DH_H_
+#define LIS3DH_H_
 
 #include "kl_i2c.h"
-#include "uart2.h"
+#include "uart.h"
 #include "board.h"
 
 #ifndef LIS3D_I2C_ADDR
 #define LIS3D_I2C_ADDR      0x19
 #endif
-#ifndef LIS3D_i2C
-#define LIS3D_i2C           i2c1
+#ifndef LIS3D_I2C
+#define LIS3D_I2C           i2c1
 #endif
 
 #define LIS3D_FIFO_LEVELS   30
@@ -82,13 +83,13 @@ class Lis3d_t {
 #endif
 private:
     uint8_t ReadReg(uint8_t RegAddr, uint8_t *Value) {
-        return LIS3D_i2C.WriteRead(LIS3D_I2C_ADDR, &RegAddr, 1, Value, 1);
+        return LIS3D_I2C.WriteRead(LIS3D_I2C_ADDR, &RegAddr, 1, Value, 1);
     }
     uint8_t WriteReg(uint8_t RegAddr, uint8_t Value) {
         uint8_t arr[2];
         arr[0] = RegAddr;
         arr[1] = Value;
-        return LIS3D_i2C.Write(LIS3D_I2C_ADDR, arr, 2);
+        return LIS3D_I2C.Write(LIS3D_I2C_ADDR, arr, 2);
     }
 public:
     Accelerations_t a[LIS3D_FIFO_LEVELS];
@@ -139,16 +140,16 @@ public:
     }
     uint8_t ReadSingle() {
         uint8_t RegAddr = LIS3D_RA_OUT_X_L | 0x80;
-        return LIS3D_i2C.WriteRead(LIS3D_I2C_ADDR, &RegAddr, 1, (uint8_t*)a, 6);
+        return LIS3D_I2C.WriteRead(LIS3D_I2C_ADDR, &RegAddr, 1, (uint8_t*)a, 6);
     }
     uint8_t ReadFIFO() {
         DBG1_SET();
         uint8_t RegAddr = LIS3D_RA_OUT_X_L | 0x80;
-        uint8_t rslt = LIS3D_i2C.WriteRead(LIS3D_I2C_ADDR, &RegAddr, 1, (uint8_t*)a, (6 * LIS3D_FIFO_LEVELS));
+        uint8_t rslt = LIS3D_I2C.WriteRead(LIS3D_I2C_ADDR, &RegAddr, 1, (uint8_t*)a, (6 * LIS3D_FIFO_LEVELS));
         DBG1_CLR();
         return rslt;
     }
-    uint8_t EnableWkupInt(uint8_t AThreshold, uint8_t ADuration) {
+    uint8_t EnableWkupIntAndLowRwr(uint8_t AThreshold, uint8_t ADuration) {
         uint8_t rslt = retvOk, b = 0;
         // CFG1: Output data rate = 100Hz, low power mode, XYZ enable
         rslt |= WriteReg(LIS3D_RA_CTRL_REG1, LIS3D_DRATE_10Hz | LIS3D_LPOWER_EN | 0b00000111);
@@ -165,12 +166,16 @@ public:
         // Dummy read REFERENCE to force set reference acceleration/tilt value
         rslt |= ReadReg(LIS3D_RA_REFERENCE, &b);
         // INT1_CFG: 6D detection, +/-XYZ interupt enable
-        rslt |= WriteReg(LIS3D_INT1_CFG, 0b01111111); //0b10010101
+        rslt |= WriteReg(LIS3D_INT1_CFG, 0b01111111);
         return rslt;
     }
     uint8_t Standby() {
+        uint8_t rslt = retvOk;
+        // Disable interrupts
+        rslt |= WriteReg(LIS3D_RA_CTRL_REG3, 0x0);
         // CFG1: Power-down mode
-        return WriteReg(LIS3D_RA_CTRL_REG1, 0x0);
+        rslt |= WriteReg(LIS3D_RA_CTRL_REG1, 0x0);
+        return rslt;
     }
 #if LIS3D_IRQ_EN
     void IIrqHandler();
@@ -185,7 +190,7 @@ PinIrq_t LisIrq(ACC_INT_PIN, &Lis);
 LisIrq.EnableIrq(IRQ_PRIO_MEDIUM);
 */
 
-#if 1 // =========================== Vector ====================================
+#if 0 // =========================== Vector ====================================
 #include "math.h"
 class Acc_t {
 public:
@@ -246,3 +251,5 @@ Acc_t Module(Acc_t Acc) {
     return Acc;
 }
 #endif
+
+#endif /* LIS3DH_H_ */
